@@ -21,14 +21,11 @@ test('login', async () => {
   expect(loginRes.body.user).toMatchObject(expectedUser);
 });
 
-
-
 test('logout', async () => {
   const testAuth = { Authorization: `Bearer ${testUserAuthToken}` };
   const logoutRes = await request(app).delete('/api/auth').set(testAuth);
   expect(logoutRes.status).toBe(200);
   expect(logoutRes.body).toMatchObject({ message: 'logout successful' });
-  con
 });
 
 function expectValidJwt(potentialJwt) {
