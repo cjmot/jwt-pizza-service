@@ -1,9 +1,11 @@
 const express = require('express');
-const { DB, Role } = require('../database/database.js');
+const { Role, createDB } = require('../database/database.js');
 const { authRouter } = require('./authRouter.js');
 const { StatusCodeError, asyncHandler } = require('../endpointHelper.js');
 
 const franchiseRouter = express.Router();
+const DB = createDB();
+DB.init();
 
 franchiseRouter.docs = [
   {

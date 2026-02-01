@@ -4,16 +4,24 @@ const config = require('../config.js');
 const { StatusCodeError } = require('../endpointHelper.js');
 const { Role } = require('../model/model.js');
 const dbModel = require('./dbModel.js');
+
 class DB {
   constructor() {
+    this.initialized = Promise.resolve();
+  }
+
+  async init() {
+    // explicit initialization
     this.initialized = this.initializeDatabase();
+    return this.initialized;
   }
 
   async getMenu() {
     const connection = await this.getConnection();
     try {
-      const rows = await this.query(connection, `SELECT * FROM menu`);
-      return rows;
+      return await this.query(connection, `SELECT * FROM menu`);
+    } catch (e) {
+      throw new StatusCodeError('unable to get menu', 500);
     } finally {
       connection.end();
     }
@@ -24,6 +32,8 @@ class DB {
     try {
       const addResult = await this.query(connection, `INSERT INTO menu (title, description, image, price) VALUES (?, ?, ?, ?)`, [item.title, item.description, item.image, item.price]);
       return { ...item, id: addResult.insertId };
+    } catch {
+      throw new StatusCodeError('unable to add menu item', 500);
     } finally {
       connection.end();
     }
@@ -50,6 +60,8 @@ class DB {
         }
       }
       return { ...user, id: userId, password: undefined };
+    } catch {
+      throw new StatusCodeError('unable to add user', 500);
     } finally {
       connection.end();
     }
@@ -70,6 +82,8 @@ class DB {
       });
 
       return { ...user, roles: roles, password: undefined };
+    } catch {
+      throw new StatusCodeError('unable to get user', 500);
     } finally {
       connection.end();
     }
@@ -94,6 +108,8 @@ class DB {
         await this.query(connection, query);
       }
       return this.getUser(email, password);
+    } catch {
+      throw new StatusCodeError('unable to update user', 500);
     } finally {
       connection.end();
     }
@@ -104,6 +120,8 @@ class DB {
     const connection = await this.getConnection();
     try {
       await this.query(connection, `INSERT INTO auth (token, userId) VALUES (?, ?) ON DUPLICATE KEY UPDATE token=token`, [token, userId]);
+    } catch {
+      throw new StatusCodeError('unable to login user', 500);
     } finally {
       connection.end();
     }
@@ -115,6 +133,8 @@ class DB {
     try {
       const authResult = await this.query(connection, `SELECT userId FROM auth WHERE token=?`, [token]);
       return authResult.length > 0;
+    } catch {
+      throw new Error();
     } finally {
       connection.end();
     }
@@ -125,6 +145,8 @@ class DB {
     const connection = await this.getConnection();
     try {
       await this.query(connection, `DELETE FROM auth WHERE token=?`, [token]);
+    } catch {
+      throw new Error();
     } finally {
       connection.end();
     }
@@ -140,6 +162,8 @@ class DB {
         order.items = items;
       }
       return { dinerId: user.id, orders: orders, page };
+    } catch {
+      throw new StatusCodeError('unable to get orders', 500);
     } finally {
       connection.end();
     }
@@ -155,6 +179,8 @@ class DB {
         await this.query(connection, `INSERT INTO orderItem (orderId, menuId, description, price) VALUES (?, ?, ?, ?)`, [orderId, menuId, item.description, item.price]);
       }
       return { ...order, id: orderId };
+    } catch {
+      throw new StatusCodeError('unable to add diner order', 500);
     } finally {
       connection.end();
     }
@@ -165,7 +191,7 @@ class DB {
     try {
       for (const admin of franchise.admins) {
         const adminUser = await this.query(connection, `SELECT id, name FROM user WHERE email=?`, [admin.email]);
-        if (adminUser.length == 0) {
+        if (adminUser.length === 0) {
           throw new StatusCodeError(`unknown user for franchise admin ${admin.email} provided`, 404);
         }
         admin.id = adminUser[0].id;
@@ -180,22 +206,24 @@ class DB {
       }
 
       return franchise;
+    } catch {
+      throw new StatusCodeError('unable to create franchise', 500);
     } finally {
-      connection.end();
+      await connection.end();
     }
   }
 
   async deleteFranchise(franchiseId) {
     const connection = await this.getConnection();
     try {
-      await connection.beginTransaction();
+      connection.beginTransaction();
       try {
         await this.query(connection, `DELETE FROM store WHERE franchiseId=?`, [franchiseId]);
         await this.query(connection, `DELETE FROM userRole WHERE objectId=?`, [franchiseId]);
         await this.query(connection, `DELETE FROM franchise WHERE id=?`, [franchiseId]);
-        await connection.commit();
+        connection.commit();
       } catch {
-        await connection.rollback();
+        connection.rollback();
         throw new StatusCodeError('unable to delete franchise', 500);
       }
     } finally {
@@ -225,6 +253,8 @@ class DB {
         }
       }
       return [franchises, more];
+    } catch {
+      throw new StatusCodeError('unable to get franchises', 500);
     } finally {
       connection.end();
     }
@@ -244,6 +274,8 @@ class DB {
         await this.getFranchise(franchise);
       }
       return franchises;
+    } catch {
+      throw new StatusCodeError('unable to get user franchises', 500);
     } finally {
       connection.end();
     }
@@ -257,6 +289,8 @@ class DB {
       franchise.stores = await this.query(connection, `SELECT s.id, s.name, COALESCE(SUM(oi.price), 0) AS totalRevenue FROM dinerOrder AS do JOIN orderItem AS oi ON do.id=oi.orderId RIGHT JOIN store AS s ON s.id=do.storeId WHERE s.franchiseId=? GROUP BY s.id`, [franchise.id]);
 
       return franchise;
+    } catch {
+      throw new StatusCodeError('unable to get user franchises', 500);
     } finally {
       connection.end();
     }
@@ -267,6 +301,8 @@ class DB {
     try {
       const insertResult = await this.query(connection, `INSERT INTO store (franchiseId, name) VALUES (?, ?)`, [franchiseId, store.name]);
       return { id: insertResult.insertId, franchiseId, name: store.name };
+    } catch {
+      throw new StatusCodeError('unable to create store', 500);
     } finally {
       connection.end();
     }
@@ -276,6 +312,8 @@ class DB {
     const connection = await this.getConnection();
     try {
       await this.query(connection, `DELETE FROM store WHERE franchiseId=? AND id=?`, [franchiseId, storeId]);
+    } catch {
+      throw new StatusCodeError('unable to delete store', 500);
     } finally {
       connection.end();
     }
@@ -303,7 +341,7 @@ class DB {
     if (rows.length > 0) {
       return rows[0].id;
     }
-    throw new Error('No ID found');
+    throw new Error('unable to find id');
   }
 
   async getConnection() {
@@ -352,7 +390,7 @@ class DB {
         connection.end();
       }
     } catch (err) {
-      console.error(JSON.stringify({ message: 'Error initializing database', exception: err.message, connection: config.db.connection }));
+      throw new StatusCodeError('unable to initialize database', 500);
     }
   }
 
@@ -362,5 +400,7 @@ class DB {
   }
 }
 
-const db = new DB();
-module.exports = { Role, DB: db };
+function createDB() {
+  return new DB();
+}
+module.exports = { Role, DBClass: DB, createDB };
