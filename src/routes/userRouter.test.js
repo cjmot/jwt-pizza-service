@@ -1,6 +1,5 @@
-const request = require('supertest');
-const app = require('../service');
-
+const request = require("supertest");
+const app = require("../service");
 const testUser = { name: 'pizza diner', email: 'reg@test.com', password: 'a' };
 let testUserAuthToken;
 
@@ -12,7 +11,7 @@ beforeAll(async () => {
 });
 
 test('login', async () => {
-    const loginRes = await request(app).put('/api/auth').send(testUser);
+    const loginRes = await request(app).get('/api/user/me').send(testUser);
     expect(loginRes.status).toBe(200);
     expectValidJwt(loginRes.body.token);
 
@@ -20,6 +19,8 @@ test('login', async () => {
     delete expectedUser.password;
     expect(loginRes.body.user).toMatchObject(expectedUser);
 });
+
+test('')
 
 test('logout', async () => {
     const testAuth = { Authorization: `Bearer ${testUserAuthToken}` };
