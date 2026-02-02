@@ -7,20 +7,14 @@ const dbModel = require('./dbModel.js');
 
 class DB {
   constructor() {
-    this.initialized = Promise.resolve();
-  }
-
-  async init() {
-    // explicit initialization
     this.initialized = this.initializeDatabase();
-    return this.initialized;
   }
 
   async getMenu() {
     const connection = await this.getConnection();
     try {
       return await this.query(connection, `SELECT * FROM menu`);
-    } catch (e) {
+    } catch {
       throw new StatusCodeError('unable to get menu', 500);
     } finally {
       connection.end();
@@ -389,7 +383,7 @@ class DB {
       } finally {
         connection.end();
       }
-    } catch (err) {
+    } catch {
       throw new StatusCodeError('unable to initialize database', 500);
     }
   }
@@ -400,7 +394,5 @@ class DB {
   }
 }
 
-function createDB() {
-  return new DB();
-}
-module.exports = { Role, DBClass: DB, createDB };
+const db = new DB();
+module.exports = { Role, DB: db };
