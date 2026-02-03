@@ -1,15 +1,17 @@
+const { expectValidJwt } = require('./index.js');
 const request = require('supertest');
 const app = require('../../service');
-let testUser = {
-    id: '',
-    name: 'pizza diner',
-    email: 'reg@test.com',
-    password: 'a',
-};
-let testUserAuthToken;
-let testAuth;
 
 describe('userRouter success', () => {
+    let testUser = {
+        id: '',
+        name: 'pizza diner',
+        email: 'reg@test.com',
+        password: 'a',
+    };
+    let testUserAuthToken;
+    let testAuth;
+
     beforeEach(async () => {
         testUser.email = Math.random().toString(36).substring(2, 12) + '@test.com';
         const registerRes = await request(app).post('/api/auth').send(testUser);
@@ -63,8 +65,4 @@ describe('userRouter success', () => {
             more: false,
         });
     });
-
-    function expectValidJwt(potentialJwt) {
-        expect(potentialJwt).toMatch(/^[a-zA-Z0-9\-_]*\.[a-zA-Z0-9\-_]*\.[a-zA-Z0-9\-_]*$/);
-    }
 });
