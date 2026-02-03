@@ -32,7 +32,7 @@ userRouter.get(
     '/me',
     authRouter.authenticateToken,
     asyncHandler(async (req, res) => {
-        res.json(req.user);
+        res.json({ user: req.user });
     })
 );
 
@@ -59,7 +59,7 @@ userRouter.delete(
     '/:userId',
     authRouter.authenticateToken,
     asyncHandler(async (req, res) => {
-        res.json({ message: 'not implemented' });
+        res.status(401).json({ message: 'not implemented' });
     })
 );
 
@@ -68,6 +68,7 @@ userRouter.get(
     '/',
     authRouter.authenticateToken,
     asyncHandler(async (req, res) => {
+        res.status(401);
         res.json({ message: 'not implemented', users: [], more: false });
     })
 );
