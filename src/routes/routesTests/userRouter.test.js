@@ -1,4 +1,4 @@
-const { expectValidJwt } = require('./index.js');
+const { expectValidJwt } = require('./testFunctions');
 const request = require('supertest');
 const app = require('../../service');
 

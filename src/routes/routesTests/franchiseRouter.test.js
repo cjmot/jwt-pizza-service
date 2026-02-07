@@ -1,5 +1,10 @@
 // javascript
-const { expectValidJwt, createAdminUser, loginUser, randomRegisteredUser } = require('./index.js');
+const {
+    expectValidJwt,
+    createAdminUser,
+    loginUser,
+    randomRegisteredUser,
+} = require('./testFunctions');
 const request = require('supertest');
 const app = require('../../service');
 const { DB } = require('../../database/database');
