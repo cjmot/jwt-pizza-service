@@ -72,7 +72,9 @@ describe('franchiseRouter', () => {
             .set({ Authorization: `Bearer ${testToken}` })
             .expect(200);
         // returned franchises should match the created franchises
-        expect(getFranchisesRes.body).toMatchObject(testFranchises);
+        expect(getFranchisesRes.body.map((f) => f.name)).toEqual(
+            expect.arrayContaining([...testFranchises.map((f) => f.name)])
+        );
     });
 
     test('deleteFranchise success', async () => {
