@@ -111,11 +111,16 @@ franchiseRouter.post(
     authRouter.authenticateToken,
     asyncHandler(async (req, res) => {
         if (!req.user.isRole(Role.Admin)) {
-            throw new StatusCodeError('unable to create a franchise', 403);
+            res.status(403).json({ message: 'unable to create franchise' });
+        } else {
+            try {
+                const franchise = req.body;
+                res.send(await DB.createFranchise(franchise));
+            } catch (e) {
+                res.status(e.statusCode);
+                res.json({ message: 'unable to create franchise' });
+            }
         }
-
-        const franchise = req.body;
-        res.send(await DB.createFranchise(franchise));
     })
 );
 
@@ -124,8 +129,14 @@ franchiseRouter.delete(
     '/:franchiseId',
     authRouter.authenticateToken,
     asyncHandler(async (req, res) => {
-        const franchiseId = Number(req.params.franchiseId);
-        await DB.deleteFranchise(franchiseId);
+        try {
+            const franchiseId = Number(req.params.franchiseId);
+            await DB.deleteFranchise(franchiseId);
+            res.json({ message: 'franchise deleted' });
+        } catch (e) {
+            res.status(e.statusCode);
+            res.json({ message: 'unable to delete franchise' });
+        }
         res.json({ message: 'franchise deleted' });
     })
 );
@@ -145,7 +156,12 @@ franchiseRouter.post(
             throw new StatusCodeError('unable to create a store', 403);
         }
 
-        res.send(await DB.createStore(franchise.id, req.body));
+        try {
+            res.send(await DB.createStore(franchise.id, req.body));
+        } catch (e) {
+            res.status(e.statusCode);
+            res.json({ message: 'unable to create store' });
+        }
     })
 );
 
@@ -164,9 +180,14 @@ franchiseRouter.delete(
             throw new StatusCodeError('unable to delete a store', 403);
         }
 
-        const storeId = Number(req.params.storeId);
-        await DB.deleteStore(franchiseId, storeId);
-        res.json({ message: 'store deleted' });
+        try {
+            const storeId = Number(req.params.storeId);
+            await DB.deleteStore(franchiseId, storeId);
+            res.json({ message: 'store deleted' });
+        } catch (e) {
+            res.status(e.statusCode);
+            res.json({ message: 'unable to delete store' });
+        }
     })
 );
 
