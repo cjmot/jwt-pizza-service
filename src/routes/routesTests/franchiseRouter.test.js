@@ -20,7 +20,7 @@ describe('franchiseRouter', () => {
             name: Math.random().toString(36).substring(2, 12) + 'TestFranchise',
             admins: [{ email: testUser.email }],
         };
-        // create franchise with admin user with franchiseeUser as a franchise admin
+        // create franchise with admin user with testUser as an admin
         const createRes = await request(app)
             .post('/api/franchise')
             .set({ Authorization: `Bearer ${adminToken}` })
@@ -51,6 +51,7 @@ describe('franchiseRouter', () => {
                 admins: [{ email: testUser.email }],
             },
         ];
+        // create franchises as admin user with testUser as an admin
         for (let franchise of testFranchises) {
             await request(app)
                 .post('/api/franchise')
@@ -63,6 +64,7 @@ describe('franchiseRouter', () => {
             .get(`/api/franchise/${testUser.id}`)
             .set({ Authorization: `Bearer ${testToken}` })
             .expect(200);
+        // returned franchises should match the created franchises
         expect(getFranchisesRes.body).toMatchObject(testFranchises);
     });
 });
