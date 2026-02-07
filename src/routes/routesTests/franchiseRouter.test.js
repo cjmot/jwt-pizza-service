@@ -1,8 +1,8 @@
 // javascript
-const { expectValidJwt } = require('./index.js');
+const { expectValidJwt, createAdminUser, loginUser, randomRegisteredUser } = require('./index.js');
 const request = require('supertest');
 const app = require('../../service');
-const { DB, Role } = require('../../database/database');
+const { DB } = require('../../database/database');
 
 describe('franchiseRouter', () => {
     let testUser = {};
@@ -140,36 +140,3 @@ describe('franchiseRouter', () => {
         expect(deleteStoreRes.body).toMatchObject({ message: 'store deleted' });
     });
 });
-
-// Create an admin user directly in DB
-async function createAdminUser(email) {
-    let user = { password: 'toomanysecrets', roles: [{ role: Role.Admin }] };
-    user.name = 'testAdmin';
-    user.email = email || Math.random().toString(36).substring(2, 12) + '@admin.com';
-
-    user = await DB.addUser(user);
-    return { ...user, password: 'toomanysecrets' };
-}
-
-async function loginUser(user) {
-    const res = await request(app)
-        .put('/api/auth')
-        .send({ email: user.email, password: user.password })
-        .expect(200);
-    return res.body.token;
-}
-
-async function register(user) {
-    const res = await request(app).post('/api/auth').send(user).expect(200);
-    return [res.body.user, res.body.token];
-}
-
-async function randomRegisteredUser() {
-    const randomString = Math.random().toString(36).substring(2, 12);
-    const randomDiner = {
-        name: randomString + 'User',
-        email: randomString + '@testUser.com',
-        password: 'testPass',
-    };
-    return await register(randomDiner);
-}
