@@ -12,9 +12,13 @@ const { DB } = require('../../database/database');
 describe('franchiseRouter', () => {
     let testUser = {};
     let testToken = '';
+    let testAdmin = {};
+    let adminToken = '';
 
     beforeEach(async () => {
         [testUser, testToken] = await randomRegisteredUser();
+        testAdmin = await createAdminUser();
+        adminToken = await loginUser(testAdmin);
         expectValidJwt(testToken);
     });
 
@@ -44,8 +48,6 @@ describe('franchiseRouter', () => {
     });
 
     test('getUserFranchises success', async () => {
-        const testAdmin = await createAdminUser();
-        const adminToken = await loginUser(testAdmin);
         const testFranchises = [
             {
                 name: Math.random().toString(36).substring(2, 12) + 'TestFranchise',
@@ -74,8 +76,6 @@ describe('franchiseRouter', () => {
     });
 
     test('deleteFranchise success', async () => {
-        const testAdmin = await createAdminUser();
-        const adminToken = await loginUser(testAdmin);
         const testFranchise = {
             name: Math.random().toString(36).substring(2, 12) + 'TestFranchise',
             admins: [{ email: testAdmin.email }],
@@ -97,8 +97,6 @@ describe('franchiseRouter', () => {
 
     test('createStore success', async () => {
         // Create franchise with testAdmin as admin
-        const testAdmin = await createAdminUser();
-        const adminToken = await loginUser(testAdmin);
         const testFranchise = {
             name: Math.random().toString(36).substring(2, 12) + 'TestFranchise',
             admins: [{ email: testAdmin.email }],
@@ -119,8 +117,6 @@ describe('franchiseRouter', () => {
     });
 
     test('deleteStore success', async () => {
-        const testAdmin = await createAdminUser();
-        const adminToken = await loginUser(testAdmin);
         const testFranchise = {
             name: Math.random().toString(36).substring(2, 12) + 'TestFranchise',
             admins: [{ email: testAdmin.email }],
