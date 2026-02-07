@@ -1,8 +1,9 @@
 # 🍕 jwt-pizza-service
 
-![Coverage badge](https://pizza-factory.cs329.click/api/badge/accountId/jwtpizzaservicecoverage)
+![Coverage badge](https://pizza-factory.cs329.click/api/badge/cjmotyer/jwtpizzaservicecoverage)
 
-Backend service for making JWT pizzas. This service tracks users and franchises and orders pizzas. All order requests are passed to the JWT Pizza Factory where the pizzas are made.
+Backend service for making JWT pizzas. This service tracks users and franchises and orders pizzas. All order requests
+are passed to the JWT Pizza Factory where the pizzas are made.
 
 JWTs are used for authentication objects.
 
@@ -11,23 +12,23 @@ JWTs are used for authentication objects.
 In order for the server to work correctly it must be configured by providing a `config.js` file.
 
 ```js
-module.exports =  {
+module.exports = {
     // Your JWT secret can be any random string you would like. It just needs to be secret.
-   jwtSecret: 'yourjwtsecrethere',
-   db: {
-   connection: {
-      host: '127.0.0.1',
-      user: 'root',
-      password: 'yourpasswordhere',
-      database: 'pizza',
-      connectTimeout: 60000,
-   },
-   listPerPage: 10,
-   },
-   factory: {
-   url: 'https://pizza-factory.cs329.click',
-   apiKey: 'yourapikeyhere',
-   },
+    jwtSecret: 'yourjwtsecrethere',
+    db: {
+        connection: {
+            host: '127.0.0.1',
+            user: 'root',
+            password: 'yourpasswordhere',
+            database: 'pizza',
+            connectTimeout: 60000,
+        },
+        listPerPage: 10,
+    },
+    factory: {
+        url: 'https://pizza-factory.cs329.click',
+        apiKey: 'yourapikeyhere',
+    },
 };
 ```
 
