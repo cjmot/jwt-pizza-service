@@ -103,7 +103,10 @@ class DB {
             });
 
             return { ...user, roles: roles, password: undefined };
-        } catch {
+        } catch (err) {
+            if (err instanceof StatusCodeError) {
+                throw err;
+            }
             throw new StatusCodeError('unable to get user', 500);
         } finally {
             connection.end();

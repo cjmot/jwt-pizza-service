@@ -23,6 +23,15 @@ describe('authRouter', () => {
         expect(loginRes.body.user).toMatchObject(expectedUser);
     });
 
+    test('login wrong email', async () => {
+        const loginRes = await request(app)
+            .put('/api/auth')
+            .send({ email: `missing-${Date.now()}@test.com`, password: testUser.password });
+
+        expect(loginRes.status).toBe(401);
+        expect(loginRes.body).toMatchObject({ message: 'unauthorized' });
+    });
+
     test('logout', async () => {
         const testAuth = { Authorization: `Bearer ${testUserAuthToken}` };
         const logoutRes = await request(app).delete('/api/auth').set(testAuth);
