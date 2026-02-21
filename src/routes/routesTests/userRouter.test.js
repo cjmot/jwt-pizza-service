@@ -106,9 +106,19 @@ describe('userRouter success', () => {
         expect(updateUserRes.body).toMatchObject({ message: 'unauthorized' });
     });
 
-    test('deleteUser returns not implemented', async () => {
+    test('deleteUser success', async () => {
         const deleteUserRes = await request(app).delete(`/api/user/${testUser.id}`).set(testAuth);
-        expect(deleteUserRes.status).toBe(401);
-        expect(deleteUserRes.body).toMatchObject({ message: 'not implemented' });
+        expect(deleteUserRes.status).toBe(200);
+        expect(deleteUserRes.body).toMatchObject({ message: 'delete successful' });
+
+        const getUserRes = await request(app).get('/api/user/me').set(testAuth);
+        expect(getUserRes.status).toBe(401);
+    });
+
+    test('deleteUser wrong id', async () => {
+        const wrongId = '1234567890';
+        const deleteUserRes = await request(app).delete(`/api/user/${wrongId}`).set(testAuth);
+        expect(deleteUserRes.status).toBe(403);
+        expect(deleteUserRes.body).toMatchObject({ message: 'unauthorized' });
     });
 });
