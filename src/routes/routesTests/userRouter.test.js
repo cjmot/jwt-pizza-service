@@ -1,9 +1,4 @@
-const {
-    expectValidJwt,
-    randomRegisteredUser,
-    createAdminUser,
-    loginUser,
-} = require('./testFunctions');
+const { expectValidJwt, createAdminUser, loginUser } = require('./testFunctions');
 const request = require('supertest');
 const app = require('../../service');
 
