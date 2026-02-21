@@ -110,6 +110,54 @@ class DB {
         }
     }
 
+    async getUsers(authUser, page = 1, limit = config.db.listPerPage, nameFilter = '*') {
+        const connection = await this.getConnection();
+
+        try {
+            page = Number(page) || 1;
+            limit = Number(limit) || config.db.listPerPage;
+            nameFilter = String(nameFilter || '*').replace(/\*/g, '%');
+            const offset = this.getOffset(page, limit);
+
+            let users;
+
+            if (!authUser?.isRole(Role.Admin)) {
+                users = await this.query(
+                    connection,
+                    `SELECT id, name, email FROM user WHERE id=? AND name LIKE ? LIMIT ${offset},${limit + 1}`,
+                    [authUser?.id, nameFilter]
+                );
+            } else {
+                users = await this.query(
+                    connection,
+                    `SELECT id, name, email FROM user WHERE name LIKE ? LIMIT ${offset},${limit + 1}`,
+                    [nameFilter]
+                );
+            }
+            const more = users.length > limit;
+            if (more) {
+                users = users.slice(0, limit);
+            }
+
+            for (const user of users) {
+                const roleResult = await this.query(
+                    connection,
+                    `SELECT role, objectId FROM userRole WHERE userId=?`,
+                    [user.id]
+                );
+                user.roles = roleResult.map((r) => {
+                    return { objectId: r.objectId || undefined, role: r.role };
+                });
+            }
+
+            return { users, page, more };
+        } catch {
+            throw new StatusCodeError('unable to get users', 500);
+        } finally {
+            connection.end();
+        }
+    }
+
     async updateUser(userId, name, email, password) {
         const connection = await this.getConnection();
         try {
@@ -131,6 +179,25 @@ class DB {
             return this.getUser(email, password);
         } catch {
             throw new StatusCodeError('unable to update user', 500);
+        } finally {
+            connection.end();
+        }
+    }
+
+    async deleteUser(userId) {
+        const connection = await this.getConnection();
+        try {
+            await this.query(connection, `DELETE FROM auth WHERE userId=?`, [userId]);
+            await this.query(connection, `DELETE FROM userRole WHERE userId=?`, [userId]);
+            const deleteResult = await this.query(connection, `DELETE FROM user WHERE id=?`, [
+                userId,
+            ]);
+
+            if (deleteResult.affectedRows === 0) {
+                throw new StatusCodeError('unknown user', 404);
+            }
+        } catch {
+            throw new StatusCodeError('unable to delete user', 500);
         } finally {
             connection.end();
         }
