@@ -110,6 +110,54 @@ class DB {
         }
     }
 
+    async getUsers(authUser, page = 1, limit = config.db.listPerPage, nameFilter = '*') {
+        const connection = await this.getConnection();
+
+        try {
+            page = Number(page) || 1;
+            limit = Number(limit) || config.db.listPerPage;
+            nameFilter = String(nameFilter || '*').replace(/\*/g, '%');
+            const offset = this.getOffset(page, limit);
+
+            let users;
+
+            if (!authUser?.isRole(Role.Admin)) {
+                users = await this.query(
+                    connection,
+                    `SELECT id, name, email FROM user WHERE id=? AND name LIKE ? LIMIT ${offset},${limit + 1}`,
+                    [authUser?.id, nameFilter]
+                );
+            } else {
+                users = await this.query(
+                    connection,
+                    `SELECT id, name, email FROM user WHERE name LIKE ? LIMIT ${offset},${limit + 1}`,
+                    [nameFilter]
+                );
+            }
+            const more = users.length > limit;
+            if (more) {
+                users = users.slice(0, limit);
+            }
+
+            for (const user of users) {
+                const roleResult = await this.query(
+                    connection,
+                    `SELECT role, objectId FROM userRole WHERE userId=?`,
+                    [user.id]
+                );
+                user.roles = roleResult.map((r) => {
+                    return { objectId: r.objectId || undefined, role: r.role };
+                });
+            }
+
+            return { users, page, more };
+        } catch {
+            throw new StatusCodeError('unable to get users', 500);
+        } finally {
+            connection.end();
+        }
+    }
+
     async updateUser(userId, name, email, password) {
         const connection = await this.getConnection();
         try {

@@ -15,6 +15,23 @@ userRouter.docs = [
         response: { id: 1, name: '常用名字', email: 'a@jwt.com', roles: [{ role: 'admin' }] },
     },
     {
+        method: 'GET',
+        path: '/api/user?page=1&limit=10&name=*',
+        requiresAuth: true,
+        description: 'Gets a list of users',
+        example: `curl -X PUT localhost:3000/api/user -H 'Authorization: Bearer tttttt'`,
+        response: {
+            users: [
+                {
+                    id: 1,
+                    name: '常用名字',
+                    email: 'a@jwt.com',
+                    roles: [{ role: 'admin' }],
+                },
+            ],
+        },
+    },
+    {
         method: 'PUT',
         path: '/api/user/:userId',
         requiresAuth: true,
@@ -33,6 +50,15 @@ userRouter.get(
     authRouter.authenticateToken,
     asyncHandler(async (req, res) => {
         res.json({ user: req.user });
+    })
+);
+
+// listUsers
+userRouter.get(
+    '/',
+    authRouter.authenticateToken,
+    asyncHandler(async (req, res) => {
+        res.json(await DB.getUsers(req.user, req.query.page, req.query.limit, req.query.name));
     })
 );
 
@@ -60,16 +86,6 @@ userRouter.delete(
     authRouter.authenticateToken,
     asyncHandler(async (req, res) => {
         res.status(401).json({ message: 'not implemented' });
-    })
-);
-
-// listUsers
-userRouter.get(
-    '/',
-    authRouter.authenticateToken,
-    asyncHandler(async (req, res) => {
-        res.status(401);
-        res.json({ message: 'not implemented', users: [], more: false });
     })
 );
 
