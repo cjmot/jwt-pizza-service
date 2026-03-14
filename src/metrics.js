@@ -1,6 +1,7 @@
 const config = require('./config');
 
 const os = require('os');
+const METRIC_INTERVAL_MS = 15000;
 
 function getCpuUsagePercentage() {
     const cpuUsage = os.loadavg()[0] / os.cpus().length;
@@ -36,9 +37,29 @@ setInterval(() => {
     });
 
     metrics.push(createMetric('greetingChange', greetingChangedCount, '1', 'sum', 'asInt', {}));
+    metrics.push(
+        createMetric(
+            'cpuUsage',
+            Number(getCpuUsagePercentage()),
+            'percent',
+            'gauge',
+            'asDouble',
+            {}
+        )
+    );
+    metrics.push(
+        createMetric(
+            'memoryUsage',
+            Number(getMemoryUsagePercentage()),
+            'percent',
+            'gauge',
+            'asDouble',
+            {}
+        )
+    );
 
     sendMetricToGrafana(metrics);
-}, 10000);
+}, METRIC_INTERVAL_MS);
 
 function createMetric(metricName, metricValue, metricUnit, metricType, valueType, attributes) {
     attributes = { ...attributes, source: config.metrics.source };
