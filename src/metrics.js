@@ -2,6 +2,7 @@ const config = require('./config');
 
 const os = require('os');
 const METRIC_INTERVAL_MS = 15000;
+const AUTHENTICATION_WINDOW_MS = 60000;
 
 function getCpuUsagePercentage() {
     const cpuUsage = os.loadavg()[0] / os.cpus().length;
@@ -19,6 +20,8 @@ function getMemoryUsagePercentage() {
 // Metrics stored in memory
 const requests = {};
 let greetingChangedCount = 0;
+let successfulAuthenticationEvents = 0;
+let failedAuthenticationEvents = 0;
 
 // Middleware to track requests
 function requestTracker(req, res, next) {
@@ -27,16 +30,45 @@ function requestTracker(req, res, next) {
     next();
 }
 
+function recordSuccessfulAuthentication() {
+    successfulAuthenticationEvents++;
+}
+
+function recordFailedAuthentication() {
+    failedAuthenticationEvents++;
+}
+
 // This will periodically send metrics to Grafana
 setInterval(() => {
     const metrics = [];
     Object.keys(requests).forEach((endpoint) => {
         metrics.push(
-            createMetric('requests', requests[endpoint], '1', 'sum', 'asInt', { endpoint })
+            createMetric('requests', requests[endpoint], '1', 'sum', 'asInt', {
+                endpoint,
+            })
         );
     });
 
-    metrics.push(createMetric('greetingChange', greetingChangedCount, '1', 'sum', 'asInt', {}));
+    metrics.push(
+        createMetric(
+            'successfulAuthentication',
+            successfulAuthenticationEvents,
+            '1',
+            'sum',
+            'asInt',
+            {}
+        )
+    );
+    metrics.push(
+        createMetric(
+            'failedAuthentication',
+            failedAuthenticationEvents,
+            '1',
+            'sum',
+            'asInt',
+            {}
+        )
+    );
     metrics.push(
         createMetric(
             'cpuUsage',
@@ -61,7 +93,14 @@ setInterval(() => {
     sendMetricToGrafana(metrics);
 }, METRIC_INTERVAL_MS);
 
-function createMetric(metricName, metricValue, metricUnit, metricType, valueType, attributes) {
+function createMetric(
+    metricName,
+    metricValue,
+    metricUnit,
+    metricType,
+    valueType,
+    attributes
+) {
     attributes = { ...attributes, source: config.metrics.source };
 
     const metric = {
@@ -86,7 +125,8 @@ function createMetric(metricName, metricValue, metricUnit, metricType, valueType
     });
 
     if (metricType === 'sum') {
-        metric[metricType].aggregationTemporality = 'AGGREGATION_TEMPORALITY_CUMULATIVE';
+        metric[metricType].aggregationTemporality =
+            'AGGREGATION_TEMPORALITY_CUMULATIVE';
         metric[metricType].isMonotonic = true;
     }
 
@@ -124,4 +164,9 @@ function sendMetricToGrafana(metrics) {
         });
 }
 
-module.exports = { requestTracker };
+module.exports = {
+    AUTHENTICATION_WINDOW_MS,
+    requestTracker,
+    recordSuccessfulAuthentication,
+    recordFailedAuthentication,
+};

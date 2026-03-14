@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const config = require('../config.js');
 const { asyncHandler } = require('../endpointHelper.js');
 const { Role, DB } = require('../database/database.js');
+const metrics = require('../metrics.js');
 
 const authRouter = express.Router();
 
@@ -81,6 +82,7 @@ authRouter.put(
     asyncHandler(async (req, res) => {
         const { email, password } = req.body;
         if (!email || !password) {
+            metrics.recordFailedAuthentication();
             return res.status(400).json({ message: 'email and password are required' });
         }
         let user;
@@ -88,11 +90,13 @@ authRouter.put(
             user = await DB.getUser(email, password);
         } catch (err) {
             if (err.statusCode === 404) {
+                metrics.recordFailedAuthentication();
                 return res.status(401).json({ message: 'unauthorized' });
             }
             throw err;
         }
         const auth = await setAuth(user);
+        metrics.recordSuccessfulAuthentication();
         res.json({ user: user, token: auth });
     })
 );
