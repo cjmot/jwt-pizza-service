@@ -53,7 +53,14 @@ orderRouter.docs = [
                     franchiseId: 1,
                     storeId: 1,
                     date: '2024-06-05T05:14:40.000Z',
-                    items: [{ id: 1, menuId: 1, description: 'Veggie', price: 0.05 }],
+                    items: [
+                        {
+                            id: 1,
+                            menuId: 1,
+                            description: 'Veggie',
+                            price: 0.05,
+                        },
+                    ],
                 },
             ],
             page: 1,
@@ -114,6 +121,7 @@ orderRouter.post(
     '/',
     authRouter.authenticateToken,
     asyncHandler(async (req, res) => {
+        const start = process.hrtime.bigint();
         const orderReq = req.body;
         const order = await DB.addDinerOrder(req.user, orderReq);
         const r = await fetch(`${config.factory.url}/api/order`, {
@@ -123,16 +131,25 @@ orderRouter.post(
                 authorization: `Bearer ${config.factory.apiKey}`,
             },
             body: JSON.stringify({
-                diner: { id: req.user.id, name: req.user.name, email: req.user.email },
+                diner: {
+                    id: req.user.id,
+                    name: req.user.name,
+                    email: req.user.email,
+                },
                 order,
             }),
         });
         const j = await r.json();
+        const durationMs = Number(process.hrtime.bigint() - start) / 1000000;
         if (r.ok) {
-            metrics.recordPizzasSold(order.items?.length ?? 0);
+            const orderPrice = (order.items ?? []).reduce(
+                (sum, item) => sum + Number(item.price ?? 0),
+                0
+            );
+            metrics.recordPizzaCreation(true, durationMs, orderPrice);
             res.send({ order, followLinkToEndChaos: j.reportUrl, jwt: j.jwt });
         } else {
-            metrics.recordPizzaCreationFailure();
+            metrics.recordPizzaCreation(false, durationMs, 0);
             res.status(500).send({
                 message: 'Failed to fulfill order at factory',
                 followLinkToEndChaos: j.reportUrl,

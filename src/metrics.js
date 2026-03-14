@@ -19,15 +19,30 @@ function getMemoryUsagePercentage() {
 
 // Metrics stored in memory
 const requests = {};
+const endpointLatencies = {};
 let successfulAuthenticationEvents = 0;
 let failedAuthenticationEvents = 0;
 let pizzasSoldCount = 0;
 let pizzaCreationFailuresCount = 0;
+let pizzaCreationLatencyMs = 0;
+let pizzaRevenue = 0;
 
 // Middleware to track requests
 function requestTracker(req, res, next) {
     const endpoint = `[${req.method}] ${req.path}`;
     requests[endpoint] = (requests[endpoint] || 0) + 1;
+    next();
+}
+
+function requestLatencyTracker(req, res, next) {
+    const start = process.hrtime.bigint();
+
+    res.on('finish', () => {
+        const endpoint = `[${req.method}] ${req.path}`;
+        endpointLatencies[endpoint] =
+            Number(process.hrtime.bigint() - start) / 1000000;
+    });
+
     next();
 }
 
@@ -39,12 +54,15 @@ function recordFailedAuthentication() {
     failedAuthenticationEvents++;
 }
 
-function recordPizzasSold(count) {
-    pizzasSoldCount += count;
-}
+function recordPizzaCreation(success, durationMs, price) {
+    pizzaCreationLatencyMs = durationMs;
 
-function recordPizzaCreationFailure() {
-    pizzaCreationFailuresCount++;
+    if (success) {
+        pizzasSoldCount++;
+        pizzaRevenue += Number(price ?? 0);
+    } else {
+        pizzaCreationFailuresCount++;
+    }
 }
 
 // This will periodically send metrics to Grafana
@@ -55,6 +73,18 @@ setInterval(() => {
             createMetric('requests', requests[endpoint], '1', 'sum', 'asInt', {
                 endpoint,
             })
+        );
+    });
+    Object.keys(endpointLatencies).forEach((endpoint) => {
+        metrics.push(
+            createMetric(
+                'endpointLatency',
+                endpointLatencies[endpoint],
+                'ms',
+                'sum',
+                'asDouble',
+                { endpoint }
+            )
         );
     });
 
@@ -88,6 +118,19 @@ setInterval(() => {
             '1',
             'sum',
             'asInt',
+            {}
+        )
+    );
+    metrics.push(
+        createMetric('pizzaRevenue', pizzaRevenue, '1', 'sum', 'asDouble', {})
+    );
+    metrics.push(
+        createMetric(
+            'pizzaCreationLatency',
+            pizzaCreationLatencyMs,
+            'ms',
+            'sum',
+            'asDouble',
             {}
         )
     );
@@ -189,8 +232,8 @@ function sendMetricToGrafana(metrics) {
 module.exports = {
     AUTHENTICATION_WINDOW_MS,
     requestTracker,
+    requestLatencyTracker,
     recordSuccessfulAuthentication,
     recordFailedAuthentication,
-    recordPizzasSold,
-    recordPizzaCreationFailure,
+    recordPizzaCreation,
 };
