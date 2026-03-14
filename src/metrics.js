@@ -3,6 +3,7 @@ const config = require('./config');
 const os = require('os');
 const METRIC_INTERVAL_MS = 15000;
 const AUTHENTICATION_WINDOW_MS = 60000;
+const ACTIVE_USER_WINDOW_MS = 300000;
 
 function getCpuUsagePercentage() {
     const cpuUsage = os.loadavg()[0] / os.cpus().length;
@@ -20,6 +21,7 @@ function getMemoryUsagePercentage() {
 // Metrics stored in memory
 const requests = {};
 const endpointLatencies = {};
+const activeUsers = new Map();
 let successfulAuthenticationEvents = 0;
 let failedAuthenticationEvents = 0;
 let pizzasSoldCount = 0;
@@ -46,6 +48,22 @@ function requestLatencyTracker(req, res, next) {
     next();
 }
 
+function activeUserTracker(req, res, next) {
+    if (req.user?.id) {
+        activeUsers.set(req.user.id, Date.now());
+    }
+
+    next();
+}
+
+function pruneInactiveUsers(now = Date.now()) {
+    for (const [userId, lastSeen] of activeUsers.entries()) {
+        if (now - lastSeen >= ACTIVE_USER_WINDOW_MS) {
+            activeUsers.delete(userId);
+        }
+    }
+}
+
 function recordSuccessfulAuthentication() {
     successfulAuthenticationEvents++;
 }
@@ -67,6 +85,7 @@ function recordPizzaCreation(success, durationMs, price) {
 
 // This will periodically send metrics to Grafana
 setInterval(() => {
+    pruneInactiveUsers();
     const metrics = [];
     Object.keys(requests).forEach((endpoint) => {
         metrics.push(
@@ -107,6 +126,9 @@ setInterval(() => {
             'asInt',
             {}
         )
+    );
+    metrics.push(
+        createMetric('activeUsers5m', activeUsers.size, '1', 'gauge', 'asInt', {})
     );
     metrics.push(
         createMetric('pizzasSold', pizzasSoldCount, '1', 'sum', 'asInt', {})
@@ -231,8 +253,10 @@ function sendMetricToGrafana(metrics) {
 
 module.exports = {
     AUTHENTICATION_WINDOW_MS,
+    ACTIVE_USER_WINDOW_MS,
     requestTracker,
     requestLatencyTracker,
+    activeUserTracker,
     recordSuccessfulAuthentication,
     recordFailedAuthentication,
     recordPizzaCreation,
