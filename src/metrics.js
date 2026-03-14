@@ -19,9 +19,10 @@ function getMemoryUsagePercentage() {
 
 // Metrics stored in memory
 const requests = {};
-let greetingChangedCount = 0;
 let successfulAuthenticationEvents = 0;
 let failedAuthenticationEvents = 0;
+let pizzasSoldCount = 0;
+let pizzaCreationFailuresCount = 0;
 
 // Middleware to track requests
 function requestTracker(req, res, next) {
@@ -36,6 +37,14 @@ function recordSuccessfulAuthentication() {
 
 function recordFailedAuthentication() {
     failedAuthenticationEvents++;
+}
+
+function recordPizzasSold(count) {
+    pizzasSoldCount += count;
+}
+
+function recordPizzaCreationFailure() {
+    pizzaCreationFailuresCount++;
 }
 
 // This will periodically send metrics to Grafana
@@ -63,6 +72,19 @@ setInterval(() => {
         createMetric(
             'failedAuthentication',
             failedAuthenticationEvents,
+            '1',
+            'sum',
+            'asInt',
+            {}
+        )
+    );
+    metrics.push(
+        createMetric('pizzasSold', pizzasSoldCount, '1', 'sum', 'asInt', {})
+    );
+    metrics.push(
+        createMetric(
+            'pizzaCreationFailures',
+            pizzaCreationFailuresCount,
             '1',
             'sum',
             'asInt',
@@ -169,4 +191,6 @@ module.exports = {
     requestTracker,
     recordSuccessfulAuthentication,
     recordFailedAuthentication,
+    recordPizzasSold,
+    recordPizzaCreationFailure,
 };
