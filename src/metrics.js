@@ -84,7 +84,7 @@ function recordPizzaCreation(success, durationMs, price) {
 }
 
 // This will periodically send metrics to Grafana
-setInterval(() => {
+const metricsReporter = setInterval(() => {
     pruneInactiveUsers();
     const metrics = [];
     Object.keys(requests).forEach((endpoint) => {
@@ -187,6 +187,8 @@ setInterval(() => {
     sendMetricToGrafana(metrics);
 }, METRIC_INTERVAL_MS);
 
+metricsReporter.unref?.();
+
 function createMetric(
     metricName,
     metricValue,
@@ -258,6 +260,32 @@ function sendMetricToGrafana(metrics) {
         });
 }
 
+function resetMetricsState() {
+    Object.keys(requests).forEach((key) => delete requests[key]);
+    Object.keys(endpointLatencies).forEach((key) => delete endpointLatencies[key]);
+    activeUsers.clear();
+    successfulAuthenticationEvents = 0;
+    failedAuthenticationEvents = 0;
+    pizzasSoldCount = 0;
+    pizzaCreationFailuresCount = 0;
+    pizzaCreationLatencyMs = 0;
+    pizzaRevenue = 0;
+}
+
+function getMetricsState() {
+    return {
+        requests: { ...requests },
+        endpointLatencies: { ...endpointLatencies },
+        activeUsers: Array.from(activeUsers.entries()),
+        successfulAuthenticationEvents,
+        failedAuthenticationEvents,
+        pizzasSoldCount,
+        pizzaCreationFailuresCount,
+        pizzaCreationLatencyMs,
+        pizzaRevenue,
+    };
+}
+
 module.exports = {
     AUTHENTICATION_WINDOW_MS,
     ACTIVE_USER_WINDOW_MS,
@@ -267,4 +295,7 @@ module.exports = {
     recordSuccessfulAuthentication,
     recordFailedAuthentication,
     recordPizzaCreation,
+    pruneInactiveUsers,
+    resetMetricsState,
+    getMetricsState,
 };

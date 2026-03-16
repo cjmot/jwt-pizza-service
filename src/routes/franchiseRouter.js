@@ -137,7 +137,6 @@ franchiseRouter.delete(
             res.status(e.statusCode);
             res.json({ message: 'unable to delete franchise' });
         }
-        res.json({ message: 'franchise deleted' });
     })
 );
 

@@ -142,4 +142,80 @@ describe('franchiseRouter', () => {
         expect(deleteStoreRes.status).toBe(200);
         expect(deleteStoreRes.body).toMatchObject({ message: 'store deleted' });
     });
+
+    test('getFranchises success', async () => {
+        const franchiseName = Math.random().toString(36).substring(2, 12) + 'ListedFranchise';
+        const createRes = await request(app)
+            .post('/api/franchise')
+            .set({ Authorization: `Bearer ${adminToken}` })
+            .send({
+                name: franchiseName,
+                admins: [{ email: testUser.email }],
+            })
+            .expect(200);
+
+        const storeName = franchiseName + 'Store';
+        await request(app)
+            .post(`/api/franchise/${createRes.body.id}/store`)
+            .set({ Authorization: `Bearer ${adminToken}` })
+            .send({ franchiseId: createRes.body.id, name: storeName })
+            .expect(200);
+
+        const getFranchisesRes = await request(app)
+            .get(
+                `/api/franchise?page=0&limit=10&name=${encodeURIComponent(franchiseName)}`
+            )
+            .expect(200);
+
+        expect(getFranchisesRes.body.franchises).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    id: createRes.body.id,
+                    name: franchiseName,
+                    stores: expect.arrayContaining([
+                        expect.objectContaining({ name: storeName }),
+                    ]),
+                }),
+            ])
+        );
+    });
+
+    test('getUserFranchises unauthorized', async () => {
+        const getFranchisesRes = await request(app).get(`/api/franchise/${testUser.id}`);
+
+        expect(getFranchisesRes.status).toBe(401);
+        expect(getFranchisesRes.body).toMatchObject({ message: 'unauthorized' });
+    });
+
+    test('createFranchise unauthorized for non-admin user', async () => {
+        const createRes = await request(app)
+            .post('/api/franchise')
+            .set({ Authorization: `Bearer ${testToken}` })
+            .send({
+                name: Math.random().toString(36).substring(2, 12) + 'ForbiddenFranchise',
+                admins: [{ email: testUser.email }],
+            });
+
+        expect(createRes.status).toBe(403);
+        expect(createRes.body).toMatchObject({ message: 'unable to create franchise' });
+    });
+
+    test('createStore unauthorized for non-admin non-franchise-admin user', async () => {
+        const franchiseRes = await request(app)
+            .post('/api/franchise')
+            .set({ Authorization: `Bearer ${adminToken}` })
+            .send({
+                name: Math.random().toString(36).substring(2, 12) + 'ProtectedFranchise',
+                admins: [{ email: testAdmin.email }],
+            })
+            .expect(200);
+
+        const createStoreRes = await request(app)
+            .post(`/api/franchise/${franchiseRes.body.id}/store`)
+            .set({ Authorization: `Bearer ${testToken}` })
+            .send({ franchiseId: franchiseRes.body.id, name: 'ForbiddenStore' });
+
+        expect(createStoreRes.status).toBe(403);
+        expect(createStoreRes.body).toMatchObject({ message: 'unable to create a store' });
+    });
 });
