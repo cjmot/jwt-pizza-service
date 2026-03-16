@@ -31,7 +31,7 @@ let pizzaRevenue = 0;
 
 // Middleware to track requests
 function requestTracker(req, res, next) {
-    const endpoint = `[${req.method}] ${req.path}`;
+    const endpoint = `[${req.method}]`;
     requests[endpoint] = (requests[endpoint] || 0) + 1;
     next();
 }
@@ -128,7 +128,14 @@ setInterval(() => {
         )
     );
     metrics.push(
-        createMetric('activeUsers5m', activeUsers.size, '1', 'gauge', 'asInt', {})
+        createMetric(
+            'activeUsers5m',
+            activeUsers.size,
+            '1',
+            'gauge',
+            'asInt',
+            {}
+        )
     );
     metrics.push(
         createMetric('pizzasSold', pizzasSoldCount, '1', 'sum', 'asInt', {})
