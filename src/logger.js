@@ -1,4 +1,4 @@
-const config = require('config');
+const config = require('./config');
 
 class Logger {
     httpLogger = (req, res, next) => {
@@ -43,10 +43,77 @@ class Logger {
     }
 
     sanitize(logData) {
-        logData = JSON.stringify(logData);
-        return logData.replace(
-            /\\"password\\":\s*\\"[^"]*\\"/g,
-            '\\"password\\": \\"*****\\"'
+        return JSON.stringify(this.sanitizeValue(logData));
+    }
+
+    sanitizeValue(value, key = '') {
+        if (value === null || value === undefined) {
+            return value;
+        }
+
+        if (this.isSensitiveKey(key)) {
+            return '*****';
+        }
+
+        if (typeof value === 'string') {
+            const trimmedValue = value.trim();
+            if (this.looksLikeJson(trimmedValue)) {
+                try {
+                    return this.sanitizeValue(JSON.parse(trimmedValue), key);
+                } catch {
+                    return this.sanitizeString(value, key);
+                }
+            }
+
+            return this.sanitizeString(value, key);
+        }
+
+        if (Array.isArray(value)) {
+            return value.map((item) => this.sanitizeValue(item, key));
+        }
+
+        if (typeof value === 'object') {
+            const sanitized = {};
+            for (const [entryKey, entryValue] of Object.entries(value)) {
+                sanitized[entryKey] = this.isSensitiveKey(entryKey)
+                    ? '*****'
+                    : this.sanitizeValue(entryValue, entryKey);
+            }
+            return sanitized;
+        }
+
+        return value;
+    }
+
+    looksLikeJson(value) {
+        return (
+            (value.startsWith('{') && value.endsWith('}')) ||
+            (value.startsWith('[') && value.endsWith(']'))
+        );
+    }
+
+    sanitizeString(value, key = '') {
+        if (this.isSensitiveKey(key)) {
+            return '*****';
+        }
+
+        let sanitized = value;
+        sanitized = sanitized.replace(/(Bearer\s+)[A-Za-z0-9\-._~+/]+=*/gi, '$1*****');
+        sanitized = sanitized.replace(
+            /([?&](?:password|passwd|token|jwt|secret|api[-_]?key|access[-_]?token|refresh[-_]?token)=)[^&\s]*/gi,
+            '$1*****'
+        );
+        sanitized = sanitized.replace(
+            /((?:password|passwd|token|jwt|secret|api[-_]?key|access[-_]?token|refresh[-_]?token)\s*[:=]\s*)([^,&\s;]+)/gi,
+            '$1*****'
+        );
+        sanitized = sanitized.replace(/((?:cookie|set-cookie)\s*:\s*)[^;\n]+/gi, '$1*****');
+        return sanitized;
+    }
+
+    isSensitiveKey(key) {
+        return /(^|[-_])(password|passwd|token|jwt|secret|authorization|auth|api[-_]?key|cookie|session([-_]?id)?|refresh([-_]?token)?|access([-_]?token)?|id[-_]?token|client[-_]?secret|credential)([-_]|$)/i.test(
+            key
         );
     }
 

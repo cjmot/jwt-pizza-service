@@ -262,7 +262,9 @@ function sendMetricToGrafana(metrics) {
 
 function resetMetricsState() {
     Object.keys(requests).forEach((key) => delete requests[key]);
-    Object.keys(endpointLatencies).forEach((key) => delete endpointLatencies[key]);
+    Object.keys(endpointLatencies).forEach(
+        (key) => delete endpointLatencies[key]
+    );
     activeUsers.clear();
     successfulAuthenticationEvents = 0;
     failedAuthenticationEvents = 0;
@@ -298,4 +300,6 @@ module.exports = {
     pruneInactiveUsers,
     resetMetricsState,
     getMetricsState,
+    sendMetricToGrafana,
+    createMetric,
 };
