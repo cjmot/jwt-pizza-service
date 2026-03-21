@@ -5,7 +5,7 @@ class Logger {
         let send = res.send;
         res.send = (resBody) => {
             const logData = {
-                authorized: !!req.headers.authorization,
+                authHeader: !!req.headers.authorization,
                 path: req.originalUrl,
                 method: req.method,
                 statusCode: res.statusCode,
