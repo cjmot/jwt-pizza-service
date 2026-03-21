@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 jobs:
   build:
-    name: Build
+    name: Build and Run Tests
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.set_version.outputs.version }}
