@@ -27,11 +27,7 @@ describe('metrics', () => {
             }),
         };
 
-        metrics.requestLatencyTracker(
-            { method: 'GET', path: '/api/order/menu' },
-            res,
-            jest.fn()
-        );
+        metrics.requestLatencyTracker({ method: 'GET', path: '/api/order/menu' }, res, jest.fn());
 
         finishHandlers.finish();
 
@@ -80,5 +76,50 @@ describe('metrics', () => {
             pizzaCreationLatencyMs: 250,
             pizzaRevenue: 0.15000000000000002,
         });
+    });
+
+    test('createMetric creates sum metric', () => {
+        const metric = metrics.createMetric('requests', 42, '1', 'sum', 'asInt', {});
+        expect(metric.name).toBe('requests');
+        expect(metric.sum.dataPoints[0].asInt).toBe(42);
+        expect(metric.sum.isMonotonic).toBe(true);
+    });
+
+    test('createMetric creates gauge metric', () => {
+        const metric = metrics.createMetric('cpuUsage', 75.5, 'percent', 'gauge', 'asDouble', {});
+        expect(metric.name).toBe('cpuUsage');
+        expect(metric.gauge.dataPoints[0].asDouble).toBe(75.5);
+        expect(metric.gauge.isMonotonic).toBeUndefined();
+    });
+
+    test('createMetric includes custom attributes', () => {
+        const metric = metrics.createMetric('test', 1, '1', 'sum', 'asInt', { endpoint: '/api' });
+        const attrs = metric.sum.dataPoints[0].attributes;
+        expect(attrs.some((a) => a.key === 'endpoint')).toBe(true);
+    });
+
+    test('sendMetricToGrafana sends to endpoint', () => {
+        global.fetch = jest.fn().mockResolvedValueOnce({ ok: true });
+        const testMetrics = [metrics.createMetric('test', 10, '1', 'sum', 'asInt', {})];
+        metrics.sendMetricToGrafana(testMetrics);
+        expect(global.fetch).toHaveBeenCalled();
+        expect(global.fetch.mock.calls[0][1].method).toBe('POST');
+    });
+
+    test('sendMetricToGrafana includes authorization', () => {
+        global.fetch = jest.fn().mockResolvedValueOnce({ ok: true });
+        metrics.sendMetricToGrafana([]);
+        const authHeader = global.fetch.mock.calls[0][1].headers.Authorization;
+        expect(authHeader).toMatch(/^Bearer/);
+    });
+
+    test('sendMetricToGrafana handles error', () => {
+        global.fetch = jest.fn().mockRejectedValueOnce(new Error('Network error'));
+        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+        metrics.sendMetricToGrafana([]);
+        setTimeout(() => {
+            expect(consoleErrorSpy).toHaveBeenCalled();
+            consoleErrorSpy.mockRestore();
+        }, 10);
     });
 });

@@ -4,6 +4,7 @@ const { Role, DB } = require('../database/database.js');
 const { authRouter } = require('./authRouter.js');
 const { asyncHandler, StatusCodeError } = require('../endpointHelper.js');
 const metrics = require('../metrics.js');
+const logger = require('../logger.js');
 
 const orderRouter = express.Router();
 
@@ -124,7 +125,7 @@ orderRouter.post(
         const start = process.hrtime.bigint();
         const orderReq = req.body;
         const order = await DB.addDinerOrder(req.user, orderReq);
-        const r = await fetch(`${config.factory.url}/api/order`, {
+        const factoryReq = {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -138,8 +139,10 @@ orderRouter.post(
                 },
                 order,
             }),
-        });
+        }
+        const r = await fetch(`${config.factory.url}/api/order`, factoryReq);
         const j = await r.json();
+        logger.factoryLogger(factoryReq, j, r.status);
         const durationMs = Number(process.hrtime.bigint() - start) / 1000000;
         if (r.ok) {
             const orderPrice = (order.items ?? []).reduce(
