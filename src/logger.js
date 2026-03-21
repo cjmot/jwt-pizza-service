@@ -24,6 +24,19 @@ class Logger {
         this.log('info', 'sql', { sql: this.sanitizeSql(sql) });
     }
 
+    factoryLogger(factoryRequest, factoryResponse, statusCode) {
+        const level =
+            typeof statusCode === 'number'
+                ? this.statusToLogLevel(statusCode)
+                : 'info';
+
+        this.log(level, 'factory', {
+            statusCode,
+            request: this.sanitizeJsonValue(factoryRequest),
+            response: this.sanitizeJsonValue(factoryResponse),
+        });
+    }
+
     log(level, type, logData) {
         const labels = {
             component: config.logging.source,
@@ -109,7 +122,10 @@ class Logger {
         if (typeof value === 'object') {
             const sanitized = {};
             for (const [entryKey, entryValue] of Object.entries(value)) {
-                sanitized[entryKey] = this.sanitizeJsonValue(entryValue, entryKey);
+                sanitized[entryKey] = this.sanitizeJsonValue(
+                    entryValue,
+                    entryKey
+                );
             }
             return sanitized;
         }
@@ -121,6 +137,13 @@ class Logger {
         return /(^|[-_])(password|passwd|token|jwt|secret|authorization|auth|api[-_]?key|cookie|session([-_]?id)?|refresh([-_]?token)?|access([-_]?token)?|id[-_]?token|client[-_]?secret|credential)([-_]|$)/i.test(
             key
         );
+    }
+
+    unhandledErrorLogger(err) {
+        this.log('error', 'unhandledError', {
+            message: err.message,
+            status: err.statusCode,
+        });
     }
 
     sendLogToGrafana(event) {
