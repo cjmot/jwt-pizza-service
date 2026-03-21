@@ -20,6 +20,10 @@ class Logger {
         next();
     };
 
+    logQuery(sql) {
+        this.log('info', 'sql', { sql: this.sanitizeSql(sql) });
+    }
+
     log(level, type, logData) {
         const labels = {
             component: config.logging.source,
@@ -45,6 +49,7 @@ class Logger {
     sanitize(logData) {
         return JSON.stringify({
             ...logData,
+            sql: this.sanitizeSql(logData.sql),
             path: this.sanitizePath(logData.path),
             reqBody: this.sanitizeJsonString(logData.reqBody),
             resBody: this.sanitizeJsonString(logData.resBody),
@@ -60,6 +65,20 @@ class Logger {
             /([?&](?:password|passwd|token|jwt|secret|api[-_]?key|access[-_]?token|refresh[-_]?token)=)[^&\s]*/gi,
             '$1*****'
         );
+    }
+
+    sanitizeSql(sql) {
+        if (typeof sql !== 'string') {
+            return sql;
+        }
+
+        return sql
+            .replace(
+                /(\b(?:password|passwd|token|access_token|refresh_token|id_token|jwt)\b\s*=\s*)(?:'(?:''|[^'])*'|"(?:\\"|[^"])*"|[^\s,;)]*)/gi,
+                "$1'***'"
+            )
+            .replace(/\s+/g, ' ')
+            .trim();
     }
 
     sanitizeJsonString(value) {
