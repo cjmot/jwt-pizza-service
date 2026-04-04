@@ -155,9 +155,13 @@ class Logger {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${config.logging.accountId}:${config.logging.apiKey}`,
             },
-        }).then((res) => {
-            if (!res.ok) console.log('Failed to send log to Grafana');
-        });
+        })
+            .then((res) => {
+                if (!res.ok) console.log('Failed to send log to Grafana');
+            })
+            .catch((error) => {
+                console.error('Error pushing logs:', error);
+            });
     }
 }
 
