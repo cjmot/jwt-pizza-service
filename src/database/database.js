@@ -280,26 +280,79 @@ class DB {
     async addDinerOrder(user, order) {
         const connection = await this.getConnection();
         try {
+            if (!Array.isArray(order?.items) || order.items.length === 0) {
+                throw new StatusCodeError('order must contain at least one item', 400);
+            }
+
             const orderResult = await this.query(
                 connection,
                 `INSERT INTO dinerOrder (dinerId, franchiseId, storeId, date) VALUES (?, ?, ?, now())`,
                 [user.id, order.franchiseId, order.storeId]
             );
             const orderId = orderResult.insertId;
+            const normalizedItems = [];
             for (const item of order.items) {
-                const menuId = await this.getID(connection, 'id', item.menuId, 'menu');
+                const menuItem = await this.getMenuItemByIdentifier(connection, item);
                 await this.query(
                     connection,
                     `INSERT INTO orderItem (orderId, menuId, description, price) VALUES (?, ?, ?, ?)`,
-                    [orderId, menuId, item.description, item.price]
+                    [orderId, menuItem.id, menuItem.description, menuItem.price]
                 );
+                normalizedItems.push({
+                    menuId: menuItem.id,
+                    description: menuItem.description,
+                    price: menuItem.price,
+                });
             }
-            return { ...order, id: orderId };
-        } catch {
+            return {
+                ...order,
+                items: normalizedItems,
+                id: orderId,
+            };
+        } catch (err) {
+            if (err instanceof StatusCodeError) {
+                throw err;
+            }
             throw new StatusCodeError('unable to add diner order', 500);
         } finally {
             connection.end();
         }
+    }
+
+    async getMenuItemByIdentifier(connection, item) {
+        const menuId = item?.menuId;
+        const menuName = item?.title ?? item?.name;
+        let menuItems;
+
+        if (menuId !== undefined && menuId !== null) {
+            menuItems = await this.query(
+                connection,
+                `SELECT id, title, description, price FROM menu WHERE id=?`,
+                [menuId]
+            );
+        } else if (menuName) {
+            menuItems = await this.query(
+                connection,
+                `SELECT id, title, description, price FROM menu WHERE title=?`,
+                [menuName]
+            );
+        } else {
+            throw new StatusCodeError(
+                'order item requires a menuId or title/name',
+                400
+            );
+        }
+
+        if (menuItems.length === 0) {
+            throw new StatusCodeError('unknown menu item', 400);
+        }
+
+        const menuItem = menuItems[0];
+        if (menuName && menuId !== undefined && menuId !== null && menuItem.title !== menuName) {
+            throw new StatusCodeError('menuId does not match menu title/name', 400);
+        }
+
+        return menuItem;
     }
 
     async createFranchise(franchise) {

@@ -69,8 +69,8 @@ describe('orderRouter', () => {
             items: [
                 {
                     menuId: menuItems[0].id,
-                    description: menuItems[0].description,
-                    price: menuItems[0].price,
+                    description: 'tampered description',
+                    price: 9999,
                 },
             ],
         };
@@ -84,7 +84,13 @@ describe('orderRouter', () => {
         expect(res.body.order).toMatchObject({
             franchiseId: franchise.id,
             storeId: store.id,
-            items: orderPayload.items,
+            items: [
+                {
+                    menuId: menuItems[0].id,
+                    description: menuItems[0].description,
+                    price: menuItems[0].price,
+                },
+            ],
         });
 
         expect(global.fetch).toHaveBeenCalled();
