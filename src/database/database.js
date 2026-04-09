@@ -86,11 +86,16 @@ class DB {
     async getUser(email, password) {
         const connection = await this.getConnection();
         try {
-            const userResult = await this.query(connection, `SELECT * FROM user WHERE email=?`, [
-                email,
-            ]);
+            const userResult = await this.query(
+                connection,
+                `SELECT * FROM user WHERE email=?`,
+                [email]
+            );
             const user = userResult[0];
-            if (!user || (password && !(await bcrypt.compare(password, user.password)))) {
+            if (
+                !user ||
+                (password && !(await bcrypt.compare(password, user.password)))
+            ) {
                 throw new StatusCodeError('unknown user', 404);
             }
 
@@ -114,7 +119,12 @@ class DB {
         }
     }
 
-    async getUsers(authUser, page = 1, limit = config.db.listPerPage, nameFilter = '*') {
+    async getUsers(
+        authUser,
+        page = 1,
+        limit = config.db.listPerPage,
+        nameFilter = '*'
+    ) {
         const connection = await this.getConnection();
 
         try {
@@ -165,23 +175,62 @@ class DB {
     async updateUser(userId, name, email, password) {
         const connection = await this.getConnection();
         try {
-            const params = [];
+            const userIdNumber = Number(userId);
+            if (!Number.isInteger(userIdNumber) || userIdNumber <= 0) {
+                throw new StatusCodeError('unknown user', 404);
+            }
+
+            const setClauses = [];
+            const values = [];
             if (password) {
                 const hashedPassword = await bcrypt.hash(password, 10);
-                params.push(`password='${hashedPassword}'`);
+                setClauses.push(`password=?`);
+                values.push(hashedPassword);
             }
             if (email) {
-                params.push(`email='${email}'`);
+                setClauses.push(`email=?`);
+                values.push(email);
             }
             if (name) {
-                params.push(`name='${name}'`);
+                setClauses.push(`name=?`);
+                values.push(name);
             }
-            if (params.length > 0) {
-                const query = `UPDATE user SET ${params.join(', ')} WHERE id=${userId}`;
-                await this.query(connection, query);
+            if (setClauses.length > 0) {
+                values.push(userIdNumber);
+                const updateResult = await this.query(
+                    connection,
+                    `UPDATE user SET ${setClauses.join(', ')} WHERE id=?`,
+                    values
+                );
+                if (updateResult.affectedRows === 0) {
+                    throw new StatusCodeError('unknown user', 404);
+                }
             }
-            return this.getUser(email, password);
-        } catch {
+
+            const userResult = await this.query(
+                connection,
+                `SELECT * FROM user WHERE id=?`,
+                [userIdNumber]
+            );
+            const user = userResult[0];
+            if (!user) {
+                throw new StatusCodeError('unknown user', 404);
+            }
+
+            const roleResult = await this.query(
+                connection,
+                `SELECT role, objectId FROM userRole WHERE userId=?`,
+                [user.id]
+            );
+            const roles = roleResult.map((r) => {
+                return { objectId: r.objectId || undefined, role: r.role };
+            });
+
+            return { ...user, roles: roles, password: undefined };
+        } catch (err) {
+            if (err instanceof StatusCodeError) {
+                throw err;
+            }
             throw new StatusCodeError('unable to update user', 500);
         } finally {
             connection.end();
@@ -191,11 +240,19 @@ class DB {
     async deleteUser(userId) {
         const connection = await this.getConnection();
         try {
-            await this.query(connection, `DELETE FROM auth WHERE userId=?`, [userId]);
-            await this.query(connection, `DELETE FROM userRole WHERE userId=?`, [userId]);
-            const deleteResult = await this.query(connection, `DELETE FROM user WHERE id=?`, [
+            await this.query(connection, `DELETE FROM auth WHERE userId=?`, [
                 userId,
             ]);
+            await this.query(
+                connection,
+                `DELETE FROM userRole WHERE userId=?`,
+                [userId]
+            );
+            const deleteResult = await this.query(
+                connection,
+                `DELETE FROM user WHERE id=?`,
+                [userId]
+            );
 
             if (deleteResult.affectedRows === 0) {
                 throw new StatusCodeError('unknown user', 404);
@@ -244,7 +301,9 @@ class DB {
         token = this.getTokenSignature(token);
         const connection = await this.getConnection();
         try {
-            await this.query(connection, `DELETE FROM auth WHERE token=?`, [token]);
+            await this.query(connection, `DELETE FROM auth WHERE token=?`, [
+                token,
+            ]);
         } catch {
             throw new Error();
         } finally {
@@ -281,7 +340,10 @@ class DB {
         const connection = await this.getConnection();
         try {
             if (!Array.isArray(order?.items) || order.items.length === 0) {
-                throw new StatusCodeError('order must contain at least one item', 400);
+                throw new StatusCodeError(
+                    'order must contain at least one item',
+                    400
+                );
             }
 
             const orderResult = await this.query(
@@ -292,7 +354,10 @@ class DB {
             const orderId = orderResult.insertId;
             const normalizedItems = [];
             for (const item of order.items) {
-                const menuItem = await this.getMenuItemByIdentifier(connection, item);
+                const menuItem = await this.getMenuItemByIdentifier(
+                    connection,
+                    item
+                );
                 await this.query(
                     connection,
                     `INSERT INTO orderItem (orderId, menuId, description, price) VALUES (?, ?, ?, ?)`,
@@ -348,8 +413,16 @@ class DB {
         }
 
         const menuItem = menuItems[0];
-        if (menuName && menuId !== undefined && menuId !== null && menuItem.title !== menuName) {
-            throw new StatusCodeError('menuId does not match menu title/name', 400);
+        if (
+            menuName &&
+            menuId !== undefined &&
+            menuId !== null &&
+            menuItem.title !== menuName
+        ) {
+            throw new StatusCodeError(
+                'menuId does not match menu title/name',
+                400
+            );
         }
 
         return menuItem;
@@ -402,13 +475,21 @@ class DB {
         try {
             connection.beginTransaction();
             try {
-                await this.query(connection, `DELETE FROM store WHERE franchiseId=?`, [
-                    franchiseId,
-                ]);
-                await this.query(connection, `DELETE FROM userRole WHERE objectId=?`, [
-                    franchiseId,
-                ]);
-                await this.query(connection, `DELETE FROM franchise WHERE id=?`, [franchiseId]);
+                await this.query(
+                    connection,
+                    `DELETE FROM store WHERE franchiseId=?`,
+                    [franchiseId]
+                );
+                await this.query(
+                    connection,
+                    `DELETE FROM userRole WHERE objectId=?`,
+                    [franchiseId]
+                );
+                await this.query(
+                    connection,
+                    `DELETE FROM franchise WHERE id=?`,
+                    [franchiseId]
+                );
                 connection.commit();
             } catch {
                 connection.rollback();
@@ -526,10 +607,11 @@ class DB {
     async deleteStore(franchiseId, storeId) {
         const connection = await this.getConnection();
         try {
-            await this.query(connection, `DELETE FROM store WHERE franchiseId=? AND id=?`, [
-                franchiseId,
-                storeId,
-            ]);
+            await this.query(
+                connection,
+                `DELETE FROM store WHERE franchiseId=? AND id=?`,
+                [franchiseId, storeId]
+            );
         } catch {
             throw new StatusCodeError('unable to delete store', 500);
         } finally {
@@ -556,7 +638,10 @@ class DB {
     }
 
     async getID(connection, key, value, table) {
-        const [rows] = await connection.execute(`SELECT id FROM ${table} WHERE ${key}=?`, [value]);
+        const [rows] = await connection.execute(
+            `SELECT id FROM ${table} WHERE ${key}=?`,
+            [value]
+        );
         if (rows.length > 0) {
             return rows[0].id;
         }
@@ -588,7 +673,11 @@ class DB {
             const connection = await this._getConnection(false);
             try {
                 const dbExists = await this.checkDatabaseExists(connection);
-                console.log(dbExists ? 'Database exists' : 'Database does not exist, creating it');
+                console.log(
+                    dbExists
+                        ? 'Database exists'
+                        : 'Database does not exist, creating it'
+                );
 
                 await connection.query(
                     `CREATE DATABASE IF NOT EXISTS ${config.db.connection.database}`
@@ -605,9 +694,9 @@ class DB {
 
                 if (!dbExists) {
                     const defaultAdmin = {
-                        name: '常用名字',
-                        email: 'a@jwt.com',
-                        password: 'admin',
+                        name: config.db.defaultAdmin.name,
+                        email: config.db.defaultAdmin.email,
+                        password: config.db.defaultAdmin.password,
                         roles: [{ role: Role.Admin }],
                     };
                     this.addUser(defaultAdmin);
