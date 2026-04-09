@@ -15,6 +15,8 @@ In order for the server to work correctly it must be configured by providing a `
 module.exports = {
     // Your JWT secret can be any random string you would like. It just needs to be secret.
     jwtSecret: 'yourjwtsecrethere',
+    // Optional JWT expiration (jsonwebtoken format), defaults to '15m'
+    jwtExpiresIn: '15m',
     db: {
         connection: {
             host: '127.0.0.1',

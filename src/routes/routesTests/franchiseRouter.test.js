@@ -218,4 +218,24 @@ describe('franchiseRouter', () => {
         expect(createStoreRes.status).toBe(403);
         expect(createStoreRes.body).toMatchObject({ message: 'unable to create a store' });
     });
+
+    test('deleteFranchise unauthorized for non-admin user', async () => {
+        const franchiseRes = await request(app)
+            .post('/api/franchise')
+            .set({ Authorization: `Bearer ${adminToken}` })
+            .send({
+                name: Math.random().toString(36).substring(2, 12) + 'ProtectedFranchise',
+                admins: [{ email: testAdmin.email }],
+            })
+            .expect(200);
+
+        const deleteRes = await request(app)
+            .delete(`/api/franchise/${franchiseRes.body.id}`)
+            .set({ Authorization: `Bearer ${testToken}` });
+
+        expect(deleteRes.status).toBe(403);
+        expect(deleteRes.body).toMatchObject({
+            message: 'unable to delete franchise',
+        });
+    });
 });

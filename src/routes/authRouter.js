@@ -9,6 +9,7 @@ const authRouter = express.Router();
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOGIN_ATTEMPT_WINDOW_MS = metrics.AUTHENTICATION_WINDOW_MS;
 const LOGIN_LOCKOUT_MS = metrics.AUTHENTICATION_WINDOW_MS;
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || config.jwtExpiresIn || '15m';
 const loginAttemptState = new Map();
 
 authRouter.docs = [
@@ -59,11 +60,20 @@ async function setAuthUser(req, res, next) {
 }
 
 // Authenticate token
-authRouter.authenticateToken = (req, res, next) => {
+authRouter.authenticateToken = async (req, res, next) => {
     if (!req.user) {
         return res.status(401).send({ message: 'unauthorized' });
     }
-    next();
+
+    try {
+        // Re-load the user from DB so authorization uses current server-side roles.
+        const freshUser = await DB.getUser(req.user.email);
+        freshUser.isRole = (role) => !!freshUser.roles.find((r) => r.role === role);
+        req.user = freshUser;
+        next();
+    } catch {
+        return res.status(401).send({ message: 'unauthorized' });
+    }
 };
 
 // register
@@ -125,7 +135,9 @@ authRouter.delete(
 );
 
 async function setAuth(user) {
-    const token = jwt.sign(user, config.jwtSecret);
+    const token = jwt.sign(user, config.jwtSecret, {
+        expiresIn: JWT_EXPIRES_IN,
+    });
     await DB.loginUser(user.id, token);
     return token;
 }
