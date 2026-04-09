@@ -9,7 +9,6 @@ const metrics = require('./metrics.js');
 const logger = require('./logger.js');
 
 const app = express();
-app.use(express.json());
 app.use(setAuthUser);
 
 // Metrics
@@ -19,6 +18,7 @@ app.use(metrics.activeUserTracker);
 
 // Logging
 app.use(logger.httpLogger);
+app.use(express.json());
 
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
@@ -66,6 +66,18 @@ app.use('*', (req, res) => {
 
 // Default error handler for all exceptions and errors.
 app.use((err, req, res, next) => {
+    // Invalid JSON bodies are client input errors, not server failures.
+    if (err?.type === 'entity.parse.failed' && err?.status === 400) {
+        logger.log('warn', 'clientError', {
+            message: 'invalid JSON request body',
+            path: req.originalUrl,
+            method: req.method,
+            statusCode: 400,
+        });
+        res.status(400).json({ message: 'invalid JSON' });
+        return next();
+    }
+
     logger.unhandledErrorLogger(err);
     res.status(err.statusCode ?? 500).json({ message: err.message });
     next();
