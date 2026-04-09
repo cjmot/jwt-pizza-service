@@ -6,6 +6,10 @@ const { Role, DB } = require('../database/database.js');
 const metrics = require('../metrics.js');
 
 const authRouter = express.Router();
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOGIN_ATTEMPT_WINDOW_MS = metrics.AUTHENTICATION_WINDOW_MS;
+const LOGIN_LOCKOUT_MS = metrics.AUTHENTICATION_WINDOW_MS;
+const loginAttemptState = new Map();
 
 authRouter.docs = [
     {
@@ -85,16 +89,25 @@ authRouter.put(
             metrics.recordFailedAuthentication();
             return res.status(400).json({ message: 'email and password are required' });
         }
+
+        const attemptKey = getLoginAttemptKey(req, email);
+        if (isLoginBlocked(attemptKey)) {
+            metrics.recordFailedAuthentication();
+            return res.status(429).json({ message: 'too many login attempts' });
+        }
+
         let user;
         try {
             user = await DB.getUser(email, password);
         } catch (err) {
             if (err.statusCode === 404) {
+                recordFailedLoginAttempt(attemptKey);
                 metrics.recordFailedAuthentication();
                 return res.status(401).json({ message: 'unauthorized' });
             }
             throw err;
         }
+        clearLoginAttemptState(attemptKey);
         const auth = await setAuth(user);
         metrics.recordSuccessfulAuthentication();
         res.json({ user: user, token: auth });
@@ -132,4 +145,64 @@ function readAuthToken(req) {
     return null;
 }
 
-module.exports = { authRouter, setAuthUser, setAuth };
+function getLoginAttemptKey(req, email) {
+    const forwardedForHeader = req.headers['x-forwarded-for'];
+    const forwardedFor = Array.isArray(forwardedForHeader)
+        ? forwardedForHeader[0]
+        : forwardedForHeader;
+    const clientIp = String(forwardedFor || req.ip || '').split(',')[0].trim();
+    return `${String(email).toLowerCase()}|${clientIp}`;
+}
+
+function isLoginBlocked(attemptKey, now = Date.now()) {
+    const attempt = loginAttemptState.get(attemptKey);
+    if (!attempt) {
+        return false;
+    }
+
+    if (attempt.blockedUntil > now) {
+        return true;
+    }
+
+    if (now - attempt.windowStart > LOGIN_ATTEMPT_WINDOW_MS) {
+        loginAttemptState.delete(attemptKey);
+    }
+    return false;
+}
+
+function recordFailedLoginAttempt(attemptKey, now = Date.now()) {
+    const current = loginAttemptState.get(attemptKey);
+    if (!current || now - current.windowStart > LOGIN_ATTEMPT_WINDOW_MS) {
+        loginAttemptState.set(attemptKey, {
+            failedCount: 1,
+            windowStart: now,
+            blockedUntil: 0,
+        });
+        return;
+    }
+
+    const failedCount = current.failedCount + 1;
+    const blockedUntil =
+        failedCount >= MAX_LOGIN_ATTEMPTS ? now + LOGIN_LOCKOUT_MS : current.blockedUntil;
+
+    loginAttemptState.set(attemptKey, {
+        ...current,
+        failedCount,
+        blockedUntil,
+    });
+}
+
+function clearLoginAttemptState(attemptKey) {
+    loginAttemptState.delete(attemptKey);
+}
+
+function clearAllLoginAttemptState() {
+    loginAttemptState.clear();
+}
+
+module.exports = {
+    authRouter,
+    setAuthUser,
+    setAuth,
+    clearAllLoginAttemptState,
+};
